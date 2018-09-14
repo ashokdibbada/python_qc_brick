@@ -6,7 +6,7 @@ Started as pet project, working in direction to make useful in doing entry level
     <li>Install Jupyter notebook</li>
 </ul><br/>
 
-## QC_rules module demo
+## Usage rules
 <ul>
 <li> Download and go to code\ - for scripts</li>
 <li> Go to reports\ for demo - QC_rulesdemo.html</li>
