@@ -1,5 +1,7 @@
 import pandas as pd
+import matplotlib
 import numpy as np
+import matplotlib.pyplot as plt
 from datetime import datetime
 import os,re
 import time
@@ -88,13 +90,13 @@ def format_check(data_frame,column,format_to_check):
     if column_data_type(data_frame,column) == "string" or column_data_type(data_frame,column) == "numeric":
         data_frame[column] = [re.sub(' +',' ',str(word)).strip() for word in data_frame[column]]
         if False in list(set([match_pattern(str(word),format_to_check) for word in data_frame[column]])):
-            return False
+            return "Failed"
     if column_data_type(data_frame,column) == "date":
         if False in list(set([validate_date(str(word),format_to_check) for word in data_frame[column]])):
-            return False
+            return "Failed"
     else:
         return "Try giving column instead of list of columns"
-    return True
+    return "Passed"
             
 # Give dataframe and column you want to look into.
 # range_args - parameters to check the range of the column
@@ -103,6 +105,7 @@ def format_check(data_frame,column,format_to_check):
 # 3) arg = sum,count - for given column, checks if the sum is bound by range_args values
 
 def agg_check(data_frame,column,range_args,arg):
+    result_list = []
     if arg == "levels":
         return pd.DataFrame({'count of '+column : data_frame.groupby(column).size()}).reset_index()
 #        count_list = []
@@ -117,7 +120,15 @@ def agg_check(data_frame,column,range_args,arg):
             if False in list(set([value < range_args[1] for value in data_frame[column]])):
                 output_file = data_frame[data_frame[column] > range_args[1]]
                 output_file.to_csv("../results/{}_{}_{}_{}_{}.csv".format(arg,column,"less than",range_args[1],"fail"))                
-            range_dic ={'Test':[column+' '+arg+' greater than '+str(range_args[0]),column+' '+arg+' less than '+str(range_args[1])], 'Result':[data_frame[column].min() > range_args[0],data_frame[column].max() < range_args[1]]}                
+            if (data_frame[column].min() > range_args[0]):
+                result_list.append("Passed")
+            else:
+                result_list.append("Failed")
+            if (data_frame[column].max() < range_args[1]):
+                result_list.append("Passed")
+            else:
+                result_list.append("Failed")
+            range_dic ={'Test':[column+' '+arg+' greater than '+str(range_args[0]),column+' '+arg+' less than '+str(range_args[1])], 'Result': result_list}                
         if column_data_type(data_frame,column) == "date":
             min_date = datetime.strptime(range_args[0], '%Y-%m-%d')
             max_date = datetime.strptime(range_args[1], '%Y-%m-%d')
@@ -127,13 +138,37 @@ def agg_check(data_frame,column,range_args,arg):
             if False in list(set([pd.to_datetime(value) < pd.Timestamp(max_date) for value in data_frame[column]])):
                 output_file = data_frame[pd.to_datetime(data_frame[column]) > max_date]
                 output_file.to_csv("../results/{}_{}_{}_{}_{}.csv".format(arg,column,"less than",range_args[1],"fail"))            
-            range_dic ={'Test':[column+' '+arg+' greater than '+str(range_args[0]),column+' '+arg+' less than '+str(range_args[1])],'Result':[pd.to_datetime(data_frame[column], errors='coerce').min() > pd.Timestamp(min_date),pd.to_datetime(data_frame[column], errors='coerce').max() < pd.Timestamp(max_date)]}
+            if (pd.to_datetime(data_frame[column], errors='coerce').min() > pd.Timestamp(min_date)):
+                result_list.append("Passed")
+            else:
+                result_list.append("Failed")
+            if (pd.to_datetime(data_frame[column], errors='coerce').max() < pd.Timestamp(max_date)):
+                result_list.append("Passed")
+            else:
+                result_list.append("Failed")
+            range_dic ={'Test':[column+' '+arg+' greater than '+str(range_args[0]),column+' '+arg+' less than '+str(range_args[1])],'Result':result_list}
         range_frame = pd.DataFrame(data=range_dic)
         return range_frame
     if arg == "sum":
-        agg_dic ={'Test':[column+' '+arg+' less than '+str(range_args[0]),column+' '+arg+' greater than '+str(range_args[1])],'Result':[  data_frame[column].sum() < range_args[0],data_frame[column].sum() > range_args[1]]}
+        if (data_frame[column].sum() < range_args[0]):
+            result_list.append("Passed")
+        else:
+            result_list.append("Failed")
+        if (data_frame[column].sum() > range_args[1]):
+            result_list.append("Passed")
+        else:
+            result_list.append("Failed")
+        agg_dic ={'Test':[column+' '+arg+' less than '+str(range_args[0]),column+' '+arg+' greater than '+str(range_args[1])],'Result':result_list}
     if arg == "count":
-        agg_dic ={'Test':[column+' '+arg+' less than '+str(range_args[0]),column+' '+arg+' greater than '+str(range_args[1])],'Result':[  data_frame[column].count() < range_args[0],data_frame[column].count() > range_args[1]]}
+        if ( data_frame[column].count() < range_args[0]):
+            result_list.append("Passed")
+        else:
+            result_list.append("Failed")
+        if (data_frame[column].count() > range_args[1]):
+            result_list.append("Passed")
+        else:
+            result_list.append("Failed")
+        agg_dic ={'Test':[column+' '+arg+' less than '+str(range_args[0]),column+' '+arg+' greater than '+str(range_args[1])],'Result':result_list}
     agg_frame = pd.DataFrame(data=agg_dic)
     return agg_frame
         
@@ -161,13 +196,6 @@ def groupby_check(data_frame,desired_columns,by_columns,func_to_check):
             nogroup_frame = nogroup_frame.append(single_frame)
         return nogroup_frame
 
-def validate_book_on_load(file_path):
-    file_name = os.path.basename(file_path)
-    if file_name.split(".")[-1] == "csv":
-        data_frame = pd.read_csv(file_path)
-    else:
-        data_frame = "Supports only csv format"
-    return data_frame
 
 def Check_with_time(data_frame,type_of_check,desired_columns,by_columns,threshold_value,func_to_check):
     if type_of_check == "quality":
@@ -202,9 +230,3 @@ def Check_with_time(data_frame,type_of_check,desired_columns,by_columns,threshol
         else:
             time_frame = pd.DataFrame([{'Test':"{} of {}".format(func_to_check , str(desired_columns)),'Result':"Completed",'Time':time_taken}])
         return time_frame, group_output
-
-def notebook_summary(file_path,final_time_frame):
-    file_name = os.path.basename(file_path)
-    file_size = os.stat(file_path).st_size
-    total_time = final_time_frame['Time'].sum()
-    return pd.DataFrame([{'Name of file':file_name,'Size of file(bytes)':file_size,'Total time':total_time}])
